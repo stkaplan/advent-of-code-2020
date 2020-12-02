@@ -5,7 +5,7 @@ import unittest
 from collections import namedtuple
 from io import StringIO
 
-Policy = namedtuple('Policy', ['min', 'max', 'letter'])
+Policy = namedtuple('Policy', ['first_pos', 'second_pos', 'letter'])
 
 def parse_line(line):
     line = line.rstrip()
@@ -20,7 +20,7 @@ def read_input(f):
     return list(map(parse_line, f))
 
 def password_is_valid(policy, password):
-    return policy.min <= password.count(policy.letter) <= policy.max
+    return (password[policy.first_pos - 1] == policy.letter) ^ (password[policy.second_pos - 1] == policy.letter)
 
 class Test(unittest.TestCase):
     @classmethod
@@ -31,7 +31,7 @@ class Test(unittest.TestCase):
         input_ = read_input(self.input)
         self.assertEqual(input_, [((1, 3, 'a'), 'abcde'), ((1, 3, 'b'), 'cdefg'), ((2, 9, 'c'), 'ccccccccc')])
         valid = [password_is_valid(policy, password) for policy, password in input_]
-        self.assertEqual(valid, [True, False, True])
+        self.assertEqual(valid, [True, False, False])
 
 if __name__ == '__main__':
     unittest.main(exit=False)
