@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import re
 import unittest
 
 def parse_passport(s):
@@ -26,15 +27,37 @@ def read_input(f):
     return list(map(parse_passport, passports))
 
 def passport_is_valid(passport):
-    required_fields = ['byr', 'iyr', 'eyr', 'hgt', 'hcl', 'ecl', 'pid']
-    return all(field in passport for field in required_fields)
+    try:
+        if not 1920 <= int(passport['byr']) <= 2002:
+            return False
+        if not 2010 <= int(passport['iyr']) <= 2020:
+            return False
+        if not 2020 <= int(passport['eyr']) <= 2030:
+            return False
+        hgt_match = re.fullmatch('([0-9]+)(cm|in)', passport['hgt'])
+        if not hgt_match:
+            return False
+        if hgt_match.group(2) == 'cm' and not 150 <= int(hgt_match.group(1)) <= 193:
+            return False
+        if hgt_match.group(2) == 'in' and not 59 <= int(hgt_match.group(1)) <= 76:
+            return False
+        if not re.fullmatch('#[0-9a-f]{6}', passport['hcl']):
+            return False
+        if not passport['ecl'] in ['amb', 'blu', 'brn', 'gry', 'grn', 'hzl', 'oth']:
+            return False
+        if not re.fullmatch('[0-9]{9}', passport['pid']):
+            return False
+        # Ignore cid
+        return True
+    except (KeyError, ValueError):
+        return False
 
 class Test(unittest.TestCase):
     def test_passport_is_valid(self):
         with open('test1.txt') as f:
             passports = read_input(f)
         valid = list(map(passport_is_valid, passports))
-        self.assertEqual(valid, [True, False, True, False])
+        self.assertEqual(valid, [False]*4 + [True]*4)
 
 if __name__ == '__main__':
     unittest.main(exit=False)
