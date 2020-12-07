@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+
+import re
+import unittest
+from collections import namedtuple
+
+RuleChild = namedtuple('RuleChild', ['bag_type', 'count'])
+
+def parse_bag_type(s):
+    match = re.fullmatch('(.+) bags?', s.strip())
+    return match.group(1)
+
+def parse_bag_type_with_count(s):
+    match = re.fullmatch('([0-9]+) (.+) bags?', s.strip().rstrip('.'))
+    return match.group(2), int(match.group(1))
+
+def parse_rule(rule):
+    bag_type_str, children_str = rule.rstrip().split(' contain ')
+    bag_type = parse_bag_type(bag_type_str)
+    if children_str == 'no other bags.':
+        children = []
+    else:
+        children = list(map(parse_bag_type_with_count, children_str.split(',')))
+    return bag_type, [RuleChild(*c) for c in children]
+
+def parse_input(f):
+    return {k: v for k, v in map(parse_rule, f)}
+
+def can_contain(rules, parent, child):
+    if any(c.bag_type == child for c in rules[parent]):
+        return True
+    else:
+        return any(can_contain(rules, c.bag_type, child) for c in rules[parent])
+
+class Test(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.test1rules = {
+            'light red': [RuleChild('bright white', 1), RuleChild('muted yellow', 2)],
+            'dark orange': [RuleChild('bright white', 3), RuleChild('muted yellow', 4)],
+            'bright white': [RuleChild('shiny gold', 1)],
+            'muted yellow': [RuleChild('shiny gold', 2), RuleChild('faded blue', 9)],
+            'shiny gold': [RuleChild('dark olive', 1), RuleChild('vibrant plum', 2)],
+            'dark olive': [RuleChild('faded blue', 3), RuleChild('dotted black', 4)],
+            'vibrant plum': [RuleChild('faded blue', 5), RuleChild('dotted black', 6)],
+            'faded blue': [],
+            'dotted black': [],
+        }
+
+    def test_parse_input(self):
+        with open('test1.txt') as f:
+            rules = parse_input(f)
+        self.assertEqual(rules, self.test1rules)
+
+    def test_can_contain(self):
+        true_types = ['bright white', 'muted yellow', 'dark orange', 'light red']
+        for bag_type in self.test1rules:
+            self.assertEqual(can_contain(self.test1rules, bag_type, 'shiny gold'), bag_type in true_types, msg=f'failed for {bag_type}')
+
+if __name__ == '__main__':
+    unittest.main(exit=False)
+
+    with open('input.txt') as f:
+        rules = parse_input(f)
+    print(sum(can_contain(rules, bag_type, 'shiny gold') for bag_type in rules))
