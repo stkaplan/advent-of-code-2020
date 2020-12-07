@@ -18,6 +18,9 @@ def parse_input(f):
 def get_union_count(group):
     return len(set().union(*group))
 
+def get_intersection_count(group):
+    return len(set.intersection(*map(set, group)))
+
 class Test(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -32,9 +35,13 @@ class Test(unittest.TestCase):
         union_count = list(map(get_union_count, self.test1groups))
         self.assertEqual(union_count, [3, 3, 3, 1, 1])
 
+    def test_get_intersection_count(self):
+        intersection_count = list(map(get_intersection_count, self.test1groups))
+        self.assertEqual(intersection_count, [3, 0, 1, 1, 1])
+
 if __name__ == '__main__':
     unittest.main(exit=False)
     with open('input.txt') as f:
         groups = parse_input(f)
 
-    print(sum(map(get_union_count, groups)))
+    print(sum(map(get_intersection_count, groups)))
