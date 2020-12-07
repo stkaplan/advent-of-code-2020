@@ -32,6 +32,9 @@ def can_contain(rules, parent, child):
     else:
         return any(can_contain(rules, c.bag_type, child) for c in rules[parent])
 
+def contained_bags(rules, bag_type):
+    return sum(child.count + child.count * contained_bags(rules, child.bag_type) for child in rules[bag_type])
+
 class Test(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -57,9 +60,19 @@ class Test(unittest.TestCase):
         for bag_type in self.test1rules:
             self.assertEqual(can_contain(self.test1rules, bag_type, 'shiny gold'), bag_type in true_types, msg=f'failed for {bag_type}')
 
+    def test_contained_bags(self):
+        self.assertEqual(contained_bags(self.test1rules, 'faded blue'), 0)
+        self.assertEqual(contained_bags(self.test1rules, 'dotted black'), 0)
+        self.assertEqual(contained_bags(self.test1rules, 'vibrant plum'), 11)
+        self.assertEqual(contained_bags(self.test1rules, 'dark olive'), 7)
+
+        with open('test2.txt') as f:
+            rules = parse_input(f)
+        self.assertEqual(contained_bags(rules, 'shiny gold'), 126)
+
 if __name__ == '__main__':
     unittest.main(exit=False)
 
     with open('input.txt') as f:
         rules = parse_input(f)
-    print(sum(can_contain(rules, bag_type, 'shiny gold') for bag_type in rules))
+    print(contained_bags(rules, 'shiny gold'))
