@@ -48,4 +48,13 @@ if __name__ == '__main__':
     unittest.main(exit=False)
     with open('input.txt') as f:
         seats = parse_input(f)
-    print(max(s.seat_id() for s in seats))
+
+    seat_ids = [s.seat_id() for s in seats]
+    min_seat_id = min(seat_ids)
+    max_seat_id = max(seat_ids)
+
+    # Magic interview trick to get missing number: add numbers and subtract from expected sum.
+    expected_sum = ((max_seat_id * (max_seat_id+1)) - ((min_seat_id-1) * (min_seat_id))) // 2
+    actual_sum = sum(seat_ids)
+    missing = expected_sum - actual_sum
+    print(missing)
