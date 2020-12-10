@@ -2,7 +2,7 @@
 
 import operator
 import unittest
-from collections import Counter
+from collections import Counter, defaultdict
 
 def parse_input(f):
     return set(map(int, f))
@@ -32,23 +32,15 @@ def get_difference_distribution(adapters):
 def find_possible_next_adapters(adapters, joltage):
     return [next_joltage for next_joltage in range (joltage+1, joltage+max_joltage_difference+1) if next_joltage in adapters]
 
-def get_all_adapter_chains(adapters):
-    completed_chains = []
-    chains = [[0]]
+def get_num_adapter_chains(adapters):
     max_joltage = max(adapters)
-    print('max = ', max_joltage)
-    while chains:
-        new_chains = []
-        for chain in chains:
-            for n in find_possible_next_adapters(adapters, chain[-1]):
-                new_chain = chain + [n]
-                if new_chain[-1] == max_joltage:
-                    completed_chains.append(new_chain)
-                else:
-                    new_chains.append(new_chain)
-        chains = new_chains
-        print(len(chains))
-    return completed_chains
+    paths = defaultdict(int)
+    paths[0] = 1
+    for joltage in range(max_joltage+1):
+        for diff in range(1, 4):
+            if joltage + diff in adapters:
+                paths[joltage + diff] += paths[joltage]
+    return paths[max_joltage]
 
 class Test(unittest.TestCase):
     def test_get_complete_adapter_chain(self):
@@ -66,14 +58,14 @@ class Test(unittest.TestCase):
             adapters = parse_input(f)
         self.assertEqual(get_difference_distribution(adapters), Counter({1:22, 3:10}))
 
-    def test_get_all_adapter_chains(self):
+    def test_get_num_adapter_chains(self):
         with open('test1.txt') as f:
             adapters = parse_input(f)
-        self.assertEqual(len(get_all_adapter_chains(adapters)), 8)
+        self.assertEqual(get_num_adapter_chains(adapters), 8)
 
         with open('test2.txt') as f:
             adapters = parse_input(f)
-        self.assertEqual(len(get_all_adapter_chains(adapters)), 19208)
+        self.assertEqual(get_num_adapter_chains(adapters), 19208)
 
 if __name__ == '__main__':
     unittest.main(exit=False)
@@ -81,5 +73,4 @@ if __name__ == '__main__':
     with open('input.txt') as f:
         adapters = parse_input(f)
 
-    chains = get_all_adapter_chains(adapters)
-    print(chains)
+    print(get_num_adapter_chains(adapters))
