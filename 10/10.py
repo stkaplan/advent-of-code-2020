@@ -2,7 +2,7 @@
 
 import operator
 import unittest
-from collections import Counter, defaultdict
+from collections import Counter
 
 def parse_input(f):
     return set(map(int, f))
@@ -34,13 +34,15 @@ def find_possible_next_adapters(adapters, joltage):
 
 def get_num_adapter_chains(adapters):
     max_joltage = max(adapters)
-    paths = defaultdict(int)
-    paths[0] = 1
+    paths = [1, 0, 0] # paths to joltage+diff
     for joltage in range(max_joltage+1):
+        paths_to_current = paths.pop(0)
+        paths.append(0)
         for diff in range(1, 4):
             if joltage + diff in adapters:
-                paths[joltage + diff] += paths[joltage]
-    return paths[max_joltage]
+                paths[diff - 1] += paths_to_current
+    return paths_to_current
+
 
 class Test(unittest.TestCase):
     def test_get_complete_adapter_chain(self):
