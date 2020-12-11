@@ -1,10 +1,10 @@
-#.LL.L#.##
-#LLLLLL.L#
+#.LL.LL.L#
+#LLLLLL.LL
 L.L.L..L..
-#LLL.LL.L#
-#.LL.LL.LL
-#.LLLL#.##
+LLLL.LL.LL
+L.LL.LL.LL
+L.LLLLL.LL
 ..L.L.....
-#LLLLLLLL#
+LLLLLLLLL#
 #.LLLLLL.L
-#.#LLLL.##
+#.LLLLL.L#
