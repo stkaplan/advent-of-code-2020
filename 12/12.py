@@ -40,32 +40,37 @@ headings = {
 }
 
 class Ship:
-    def __init__(self, x=0, y=0, heading=ActionType.MOVE_EAST):
+    def __init__(self, x=0, y=0, waypoint_x=10, waypoint_y=1):
         self.x = x
         self.y = y
-        self.heading = heading
+        self.waypoint_x = waypoint_x
+        self.waypoint_y = waypoint_y
 
     def __eq__(self, other):
-        return self.x == other.x and self.y == other.y and self.heading == other.heading
+        return self.x == other.x and self.y == other.y \
+               and self.waypoint_x == other.waypoint_x and self.waypoint_y == other.waypoint_y
 
     def __repr__(self):
-        return f'Ship({self.x}, {self.y}, {self.heading})'
-
-    def move(self, heading, amount):
-            self.x += heading[0] * amount
-            self.y += heading[1] * amount
+        return f'Ship({self.x}, {self.y}, {self.waypoint_x}, {self.waypoint_y})'
 
     def do_action(self, action):
         if action.type == ActionType.MOVE_FORWARD:
-            self.move(headings[self.heading], action.value)
-        elif action.type in [ActionType.TURN_LEFT, ActionType.TURN_RIGHT]:
+            self.x += self.waypoint_x * action.value
+            self.y += self.waypoint_y * action.value
+        elif action.type == ActionType.TURN_LEFT:
             assert(action.value % 90 == 0)
-            direction = 1 if action.type == ActionType.TURN_RIGHT else -1
             amount = action.value // 90
-            self.heading += direction * amount
-            self.heading %= 4
+            for _ in range(amount):
+                self.waypoint_x, self.waypoint_y = -self.waypoint_y, self.waypoint_x
+        elif action.type == ActionType.TURN_RIGHT:
+            assert(action.value % 90 == 0)
+            amount = action.value // 90
+            for _ in range(amount):
+                self.waypoint_x, self.waypoint_y = self.waypoint_y, -self.waypoint_x
         else:
-            self.move(headings[action.type], action.value)
+            heading = headings[action.type]
+            self.waypoint_x += heading[0] * action.value
+            self.waypoint_y += heading[1] * action.value
 
 class Test(unittest.TestCase):
     @classmethod
@@ -85,15 +90,15 @@ class Test(unittest.TestCase):
 
     def test_do_action(self):
         steps = [
-            Ship(10, 0, ActionType.MOVE_EAST),
-            Ship(10, 3, ActionType.MOVE_EAST),
-            Ship(17, 3, ActionType.MOVE_EAST),
-            Ship(17, 3, ActionType.MOVE_SOUTH),
-            Ship(17, -8, ActionType.MOVE_SOUTH),
+            Ship(100, 10, 10, 1),
+            Ship(100, 10, 10, 4),
+            Ship(170, 38, 10, 4),
+            Ship(170, 38, 4, -10),
+            Ship(214, -72, 4, -10),
         ]
 
         ship = Ship()
-        self.assertEqual(ship, Ship(0, 0, ActionType.MOVE_EAST))
+        self.assertEqual(ship, Ship(0, 0, 10, 1))
         for action, pos in zip(self.test1actions, steps):
             ship.do_action(action)
             self.assertEqual(ship, pos)
