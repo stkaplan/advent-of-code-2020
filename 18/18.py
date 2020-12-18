@@ -18,39 +18,54 @@ def is_single_expr_in_parens(s):
             if parens == 0:
                 return i == len(s)-1
 
-def get_end_token(s):
-    if s[-1] == ')':
+def get_token(s):
+    # Read until first multiplication that isn't in a parenthesized sub-expression.
+    parens = 0
+    for i, c in enumerate(s):
+        if parens == 0 and c == '*':
+            return s[0:i-1], s[i:]
+        elif c == '(':
+            parens += 1
+        elif c == ')':
+            parens -= 1
+
+    # No multiplication; everything is addition.
+    # If the first term is a parenthesized expression, get that.
+    if s[0] == '(':
         parens = 0
-        for i, c in enumerate(reversed(s)):
-            if c == ')':
+        for i, c in enumerate(s):
+            if c == '(':
                 parens += 1
-            elif c == '(':
+            elif c == ')':
                 parens -= 1
                 if parens == 0:
-                    return s[-i:-1], s[0:-i-2]
-    else:
-        for i, c in enumerate(reversed(s)):
-            if c == ' ':
-                return s[-i:], s[0:-i-1]
-        return s
+                    return s[1:i], s[i+2:]
+
+    # Nothing special, so just read the first term (until space).
+    for i, c in enumerate(s):
+        if c == ' ':
+            return s[0:i], s[i+1:]
 
 def parse_string(s):
     while is_single_expr_in_parens(s):
         s = s[1:-1]
 
-    rhs, s = get_end_token(s)
+    lhs, s = get_token(s)
     try:
-        rhs = int(rhs)
+        lhs = int(lhs)
     except ValueError:
-        rhs = parse_string(rhs)
+        lhs = parse_string(lhs)
 
-    op, s = get_end_token(s)
+    op = s[0]
+    s = s[2:]
     assert(len(op) == 1)
 
+    while is_single_expr_in_parens(s):
+        s = s[1:-1]
     try:
-        lhs = int(s)
+        rhs = int(s)
     except ValueError:
-        lhs = parse_string(s)
+        rhs = parse_string(s)
     return Expression(lhs, op, rhs)
 
 def evaluate_string(s):
@@ -71,31 +86,26 @@ class Test(unittest.TestCase):
         self.assertEqual(parse_string('1 + 2'), Expression(1, '+', 2))
         self.assertEqual(parse_string('1 + 2 * 3'), Expression(Expression(1, '+', 2), '*', 3))
         self.assertEqual(parse_string('1 + 2 * 3 + 4 * 5 + 6'),
-            Expression(
-                Expression(
-                    Expression(
-                        Expression(
-                            Expression(1, '+', 2),
-                            '*', 3),
-                        '+', 4),
-                    '*', 5),
-                '+', 6))
-        self.assertEqual(parse_string('1 + (2 * 3)'), Expression(1, '+', Expression(2, '*', 3)))
+            Expression(Expression(1, '+', 2), '*',
+                Expression(Expression(3, '+', 4), '*', Expression(5, '+', 6))
+            ))
+        self.assertEqual(parse_string('(1 + 2) * 3'), Expression(Expression(1, '+', 2), '*', 3))
         self.assertEqual(parse_string('1 + (2 * (3 + 4) * 5)'),
             Expression(1, '+',
-                Expression(
-                    Expression(2, '*', Expression(3, '+', 4)),
-                '*', 5)
-                ))
+                    Expression(2, '*',
+                        Expression(Expression(3, '+', 4), '*', 5)
+                    )
+                )
+            )
         self.assertEqual(parse_string('(1 + 2) * 3'), Expression(Expression(1, '+', 2), '*', 3))
 
     def test_evaluate_string(self):
-        self.assertEqual(evaluate_string('1 + 2 * 3 + 4 * 5 + 6'), 71)
+        self.assertEqual(evaluate_string('1 + 2 * 3 + 4 * 5 + 6'), 231)
         self.assertEqual(evaluate_string('1 + (2 * 3) + (4 * (5 + 6))'), 51)
-        self.assertEqual(evaluate_string('2 * 3 + (4 * 5)'), 26)
-        self.assertEqual(evaluate_string('5 + (8 * 3 + 9 + 3 * 4 * 3)'), 437)
-        self.assertEqual(evaluate_string('5 * 9 * (7 * 3 * 3 + 9 * 3 + (8 + 6 * 4))'), 12240)
-        self.assertEqual(evaluate_string('((2 + 4 * 9) * (6 + 9 * 8 + 6) + 6) + 2 + 4 * 2'), 13632)
+        self.assertEqual(evaluate_string('2 * 3 + (4 * 5)'), 46)
+        self.assertEqual(evaluate_string('5 + (8 * 3 + 9 + 3 * 4 * 3)'), 1445)
+        self.assertEqual(evaluate_string('5 * 9 * (7 * 3 * 3 + 9 * 3 + (8 + 6 * 4))'), 669060)
+        self.assertEqual(evaluate_string('((2 + 4 * 9) * (6 + 9 * 8 + 6) + 6) + 2 + 4 * 2'), 23340)
 
 if __name__ == '__main__':
     unittest.main(exit=False)
