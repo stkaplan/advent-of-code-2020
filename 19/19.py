@@ -69,6 +69,10 @@ def message_matches_rule(message, rules, rule_id, rule_cache, sequence_cache):
     rule_cache[(message, rule_id)] = result
     return result
 
+def update_rules(rules):
+    rules[8] = [[42], [42, 8]]
+    rules[11] = [[42, 31], [42, 11, 31]]
+
 class Test(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -108,6 +112,19 @@ class Test(unittest.TestCase):
         for message, result in zip(self.test2messages, test2results):
             self.assertEqual(message_matches_rule(message, self.test2rules, 0, {}, {}), result, message)
 
+    def test_part2(self):
+        with open('test3.txt') as f:
+            input_ = parse_input(f)
+
+        for i, message in enumerate(input_.messages):
+            result = i in (1, 6, 7)
+            self.assertEqual(message_matches_rule(message, input_.rules, 0, {}, {}), result, message)
+
+        update_rules(input_.rules)
+        for i, message in enumerate(input_.messages):
+            result = i not in (0, 11, 13)
+            self.assertEqual(message_matches_rule(message, input_.rules, 0, {}, {}), result, message)
+
 if __name__ == '__main__':
     unittest.main(exit=False)
 
@@ -115,6 +132,7 @@ if __name__ == '__main__':
         input_ = parse_input(f)
 
     # Print results individually so I can see the progress.
+    update_rules(input_.rules)
     matching = 0
     for m in input_.messages:
         result = message_matches_rule(m, input_.rules, 0, {}, {})
