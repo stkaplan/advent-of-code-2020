@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 
+# This does a ton of duplicated work to find the assembled image: calculating
+# tile rotations multiple times, etc. But it's fast enough for the input, so
+# whatever. Today's problem is really tedious and not worth working on any
+# further.
+
 import functools
 import itertools
 import math
@@ -29,15 +34,13 @@ def reverse_edge(edge, length):
         edge >>= 1
     return rev
 
-def edge_matches(edge1, edge2, length):
-    if edge1 == edge2:
-        return True
-    else:
-        return edge1 == reverse_edge(edge2, length)
+def get_edge_min(edge, length):
+    return min(edge, reverse_edge(edge, length))
 
 class Tile:
-    def __init__(self, image):
+    def __init__(self, image, tile_num):
         self.image = image
+        self.tile_num = tile_num
         self.top = canonicalize_edge(image[0])
         self.bottom = canonicalize_edge(image[-1])
         self.left = canonicalize_edge([row[0] for row in image])
@@ -57,11 +60,11 @@ class Tile:
         for x in range(self.length):
             for y in range(self.length):
                 image[y][x] = self.image[self.length - x - 1][y]
-        return Tile(image)
+        return Tile(image, self.tile_num)
 
     def flipped_y(self):
         image = [list(reversed(row)) for row in self.image]
-        return Tile(image)
+        return Tile(image, self.tile_num)
 
     def get_orientation(self, orientation):
         if orientation == Orientation.NORMAL:
@@ -87,7 +90,7 @@ def parse_input(f):
     image = []
     for line in f:
         if line.isspace():
-            tiles[tile_num] = Tile(image)
+            tiles[tile_num] = Tile(image, tile_num)
             tile_num = None
             image = []
         elif tile_num is None:
@@ -102,14 +105,10 @@ def parse_input(f):
 TilesSorted = namedtuple('TilesSorted', ['corners', 'edges', 'middle'])
 TileInImage = namedtuple('TileInImage', ['tile_num', 'orientation'])
 
-# Shortcut: assume there's a single way the picture can be recreated, and the
-# picture edges are unique (can't be matched to any other edge). Then the
-# corners are the only pieces with 2 unique edges, and the edge pieces have 1
-# unique edge.
+# Shortcut: assume the picture edges are unique (can't be matched to any other
+# edge). Then the corners are the only pieces with 2 unique edges, and the edge
+# pieces have 1 unique edge.
 def sort_tiles(tiles):
-    def get_edge_min(edge, length):
-        return min(edge, reverse_edge(edge, length))
-
     tiles_sorted = TilesSorted(set(), set(), set())
 
     edge_counts = {}
@@ -137,40 +136,80 @@ def sort_tiles(tiles):
     # N-1 pieces on each edge, but subtract out the 4 corner pieces.
     assert(len(tiles_sorted.edges) == (math.sqrt(len(tiles))-1) * 4 - 4)
     assert(len(tiles_sorted.middle) == (math.sqrt(len(tiles))-2) ** 2)
-    return tiles_sorted
+    return tiles_sorted, edge_counts
 
 # We're filling in the image left to right, top to bottom. So we only need to
 # check left and top neighbors.
-def tile_matches(image, tile, x, y):
-    match = True
-    orientation = None
+def test_orientation(image, tiles, tile_num, orientation, x, y):
+    tile_oriented = tiles[tile_num].get_orientation(orientation)
 
-    # First figure out if we match the left neighbor (unless we're on the left edge).
+    if x != len(image)-1:
+        assert(image[x+1][y] is None)
+    if y != len(image)-1:
+        assert(image[x][y+1] is None)
+
     if x != 0:
-        pass
+        assert(image[x-1][y] is not None)
+        if image[x-1][y].right != tile_oriented.left:
+            return None
 
-    return orientation
+    if y != 0:
+        assert(image[x][y-1] is not None)
+        if image[x][y-1].bottom != tile_oriented.top:
+            return None
 
-def fit_tile(image, tiles_sorted, x, y):
-    if (x == 0 and y == 0) or (x == 0 and y == len(image)-1) or (x == len(image)-1 and y == 0) or (x == len(image)-1 and y == len(image)-1):
-        # Corner
-        pass
-    elif x == 0 or x == len(image)-1 or y == 0 or y == len(image)-1:
-        # Edge
-        pass
+    return orientation, tile_oriented
+
+def get_matching_orientation(image, tiles, tile_num, x, y):
+    for orientation in Orientation:
+        match = test_orientation(image, tiles, tile_num, orientation, x, y)
+        if match is not None:
+            return match
+
+def check_for_matches(image, tiles, tile_set, x, y):
+    for tile_num in tile_set:
+        match = get_matching_orientation(image, tiles, tile_num, x, y)
+        if match is not None:
+            orientation, tile_oriented = match
+            return tile_num, orientation, tile_oriented
     else:
-        # Middle
-        pass
-    pass
+        raise Exception(f'no matching tile for ({x}, {y})')
+
+def fit_tile(image, tiles, tiles_sorted, x, y):
+    if (x == 0 and y == 0) or (x == 0 and y == len(image)-1) or (x == len(image)-1 and y == 0) or (x == len(image)-1 and y == len(image)-1):
+        relevant_tiles = tiles_sorted.corners
+    elif x == 0 or x == len(image)-1 or y == 0 or y == len(image)-1:
+        relevant_tiles = tiles_sorted.edges
+    else:
+        relevant_tiles = tiles_sorted.middle
+
+    tile_num, orientation, tile_oriented = check_for_matches(image, tiles, relevant_tiles, x, y)
+    relevant_tiles.remove(tile_num)
+    image[x][y] = tile_oriented
 
 def assemble_image(tiles):
-    tiles_sorted = sort_tiles(tiles)
-    length = int(math.sqrt(tiles))
-    image = [[[None] * length] for _ in range(length)]
+    tiles_sorted, edge_counts = sort_tiles(tiles)
+    length = int(math.sqrt(len(tiles)))
+    image = [[None] * length for _ in range(length)]
 
     for x in range(length):
         for y in range(length):
-            fit_tile(image, tiles_sorted, x, y)
+            if x == 0 and y == 0:
+                # Fit the first corner, in whichever orientation has unmatched edges on the top and left.
+                tile_num = next(iter(tiles_sorted.corners))
+                tile = tiles[tile_num]
+                tiles_sorted.corners.remove(tile_num)
+                for ori in Orientation:
+                    tile_oriented = tile.get_orientation(ori)
+                    if edge_counts[get_edge_min(tile_oriented.top, tile.length)] == 1 and edge_counts[get_edge_min(tile_oriented.left, tile.length)] == 1:
+                        image[0][0] = tile_oriented
+                        break
+                else:
+                    raise Exception('Could not fit tile (0,0)')
+            else:
+                fit_tile(image, tiles, tiles_sorted, x, y)
+
+    return image
 
 class Test(unittest.TestCase):
     def test_reverse_edge(self):
@@ -183,7 +222,7 @@ class Test(unittest.TestCase):
             [True, True, False, False],
             [True, False, True, False],
             [False, True, False, True],
-        ])
+        ], 1234)
         tile_image = '''\
 ..##
 ##..
@@ -237,8 +276,19 @@ class Test(unittest.TestCase):
         with open('test1.txt') as f:
             tiles = parse_input(f)
 
-        tiles_sorted = sort_tiles(tiles)
+        tiles_sorted, _ = sort_tiles(tiles)
         self.assertEqual(set(tiles_sorted.corners), set((1951, 3079, 2971, 1171)))
+
+    def test_assemble_image(self):
+        with open('test1.txt') as f:
+            tiles = parse_input(f)
+
+        # There are multiple possible solutions for this, so just run it and make sure it doesn't fail.
+        image = assemble_image(tiles)
+
+        tiles_sorted, _ = sort_tiles(tiles)
+        corners = [t.tile_num for t in (image[0][0], image[0][-1], image[-1][-1], image[-1][0])]
+        self.assertEqual(set(corners), tiles_sorted.corners)
 
 if __name__ == '__main__':
     unittest.main(exit=False)
@@ -246,5 +296,6 @@ if __name__ == '__main__':
     with open('input.txt') as f:
         tiles = parse_input(f)
 
-    tiles_sorted = sort_tiles(tiles)
-    print(functools.reduce(operator.mul, tiles_sorted.corners, 1))
+    image = assemble_image(tiles)
+    corners = [t.tile_num for t in (image[0][0], image[0][-1], image[-1][-1], image[-1][0])]
+    print(functools.reduce(operator.mul, corners, 1))
