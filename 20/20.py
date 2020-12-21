@@ -37,6 +37,34 @@ def reverse_edge(edge, length):
 def get_edge_min(edge, length):
     return min(edge, reverse_edge(edge, length))
 
+def rotated_clockwise(array):
+    new_array = [[None] * len(array) for _ in range(len(array))]
+    for x in range(len(array)):
+        for y in range(len(array)):
+            new_array[y][x] = array[len(array) - x - 1][y]
+    return new_array
+
+def flipped_y(array):
+    return [list(reversed(row)) for row in array]
+
+def get_orientation(array, orientation):
+    if orientation == Orientation.NORMAL:
+        return array
+    elif orientation == Orientation.ROTATED_90:
+        return rotated_clockwise(array)
+    elif orientation == Orientation.ROTATED_180:
+        return rotated_clockwise(rotated_clockwise(array))
+    elif orientation == Orientation.ROTATED_270:
+        return rotated_clockwise(rotated_clockwise(rotated_clockwise(array)))
+    elif orientation == Orientation.FLIPPED:
+        return flipped_y(array)
+    elif orientation == Orientation.FLIPPED_ROTATED_90:
+        return rotated_clockwise(flipped_y(array))
+    elif orientation == Orientation.FLIPPED_ROTATED_180:
+        return rotated_clockwise(rotated_clockwise(flipped_y(array)))
+    elif orientation == Orientation.FLIPPED_ROTATED_270:
+        return rotated_clockwise(rotated_clockwise(rotated_clockwise(flipped_y(array))))
+
 class Tile:
     def __init__(self, image, tile_num):
         self.image = image
@@ -55,34 +83,8 @@ class Tile:
             return ''.join('#' if x else '.' for x in row) + '\n'
         return ''.join(row_as_line(row) for row in self.image)
 
-    def rotated_clockwise(self):
-        image = [[False] * self.length for _ in range(self.length)]
-        for x in range(self.length):
-            for y in range(self.length):
-                image[y][x] = self.image[self.length - x - 1][y]
-        return Tile(image, self.tile_num)
-
-    def flipped_y(self):
-        image = [list(reversed(row)) for row in self.image]
-        return Tile(image, self.tile_num)
-
     def get_orientation(self, orientation):
-        if orientation == Orientation.NORMAL:
-            return self
-        elif orientation == Orientation.ROTATED_90:
-            return self.rotated_clockwise()
-        elif orientation == Orientation.ROTATED_180:
-            return self.rotated_clockwise().rotated_clockwise()
-        elif orientation == Orientation.ROTATED_270:
-            return self.rotated_clockwise().rotated_clockwise().rotated_clockwise()
-        elif orientation == Orientation.FLIPPED:
-            return self.flipped_y()
-        elif orientation == Orientation.FLIPPED_ROTATED_90:
-            return self.flipped_y().rotated_clockwise()
-        elif orientation == Orientation.FLIPPED_ROTATED_180:
-            return self.flipped_y().rotated_clockwise().rotated_clockwise()
-        elif orientation == Orientation.FLIPPED_ROTATED_270:
-            return self.flipped_y().rotated_clockwise().rotated_clockwise().rotated_clockwise()
+        return Tile(get_orientation(self.image, orientation), self.tile_num)
 
 def parse_input(f):
     tiles = {}
@@ -211,6 +213,21 @@ def assemble_image(tiles):
 
     return image
 
+def combine_tiles(image):
+    combined_image = []
+
+    outer_length = len(image)
+    inner_length = len(image[0][0].image)
+
+    for y in range(outer_length):
+        for i in range(inner_length):
+            row = []
+            for x in range(outer_length):
+                row += image[x][y].image[i]
+            combined_image.append(row)
+
+    return combined_image
+
 class Test(unittest.TestCase):
     def test_reverse_edge(self):
         edge = 0b001100010
@@ -238,38 +255,38 @@ class Test(unittest.TestCase):
 .#.#
 #..#
 '''
-        rotated_90 = tile.rotated_clockwise()
-        self.assertEqual(rotated_90.as_image(), rotated_90_image)
+        rotated_90 = rotated_clockwise(tile.image)
+        self.assertEqual(Tile(rotated_90, 0).as_image(), rotated_90_image)
         self.assertEqual(tile.get_orientation(Orientation.ROTATED_90).as_image(), rotated_90_image)
 
-        rotated_180 = rotated_90.rotated_clockwise()
+        rotated_180 = rotated_clockwise(rotated_90)
         rotated_180_image = '''\
 #.#.
 .#.#
 ..##
 ##..
 '''
-        self.assertEqual(rotated_180.as_image(), rotated_180_image)
+        self.assertEqual(Tile(rotated_180, 0).as_image(), rotated_180_image)
         self.assertEqual(tile.get_orientation(Orientation.ROTATED_180).as_image(), rotated_180_image)
 
-        flipped = tile.flipped_y()
+        flipped = flipped_y(tile.image)
         flipped_image = '''\
 ##..
 ..##
 .#.#
 #.#.
 '''
-        self.assertEqual(flipped.as_image(), flipped_image)
+        self.assertEqual(Tile(flipped, 0).as_image(), flipped_image)
         self.assertEqual(tile.get_orientation(Orientation.FLIPPED).as_image(), flipped_image)
 
-        flipped_rotated_270 = flipped.rotated_clockwise().rotated_clockwise().rotated_clockwise()
+        flipped_rotated_270 = rotated_clockwise(rotated_clockwise(rotated_clockwise(flipped)))
         flipped_rotated_270_image = '''\
 .##.
 .#.#
 #.#.
 #..#
 '''
-        self.assertEqual(flipped_rotated_270.as_image(), flipped_rotated_270_image)
+        self.assertEqual(Tile(flipped_rotated_270, 0).as_image(), flipped_rotated_270_image)
         self.assertEqual(tile.get_orientation(Orientation.FLIPPED_ROTATED_270).as_image(), flipped_rotated_270_image)
 
     def test_sort_image(self):
