@@ -38,10 +38,12 @@ def get_edge_min(edge, length):
     return min(edge, reverse_edge(edge, length))
 
 def rotated_clockwise(array):
-    new_array = [[None] * len(array) for _ in range(len(array))]
-    for x in range(len(array)):
-        for y in range(len(array)):
-            new_array[y][x] = array[len(array) - x - 1][y]
+    height = len(array)
+    width = len(array[0])
+    new_array = [[None] * height for _ in range(width)]
+    for row in range(height):
+        for col in range(width):
+            new_array[col][row] = array[height - row - 1][col]
     return new_array
 
 def flipped_y(array):
@@ -146,18 +148,18 @@ def test_orientation(image, tiles, tile_num, orientation, x, y):
     tile_oriented = tiles[tile_num].get_orientation(orientation)
 
     if x != len(image)-1:
-        assert(image[x+1][y] is None)
+        assert(image[y][x+1] is None)
     if y != len(image)-1:
-        assert(image[x][y+1] is None)
+        assert(image[y+1][x] is None)
 
     if x != 0:
-        assert(image[x-1][y] is not None)
-        if image[x-1][y].right != tile_oriented.left:
+        assert(image[y][x-1] is not None)
+        if image[y][x-1].right != tile_oriented.left:
             return None
 
     if y != 0:
-        assert(image[x][y-1] is not None)
-        if image[x][y-1].bottom != tile_oriented.top:
+        assert(image[y-1][x] is not None)
+        if image[y-1][x].bottom != tile_oriented.top:
             return None
 
     return orientation, tile_oriented
@@ -187,15 +189,15 @@ def fit_tile(image, tiles, tiles_sorted, x, y):
 
     tile_num, orientation, tile_oriented = check_for_matches(image, tiles, relevant_tiles, x, y)
     relevant_tiles.remove(tile_num)
-    image[x][y] = tile_oriented
+    image[y][x] = tile_oriented
 
 def assemble_image(tiles):
     tiles_sorted, edge_counts = sort_tiles(tiles)
     length = int(math.sqrt(len(tiles)))
     image = [[None] * length for _ in range(length)]
 
-    for x in range(length):
-        for y in range(length):
+    for y in range(length):
+        for x in range(length):
             if x == 0 and y == 0:
                 # Fit the first corner, in whichever orientation has unmatched edges on the top and left.
                 tile_num = next(iter(tiles_sorted.corners))
@@ -220,13 +222,60 @@ def combine_tiles(image):
     inner_length = len(image[0][0].image)
 
     for y in range(outer_length):
-        for i in range(inner_length):
+        for i in range(1, inner_length-1):
             row = []
             for x in range(outer_length):
-                row += image[x][y].image[i]
+                row += image[y][x].image[i][1:-1]
             combined_image.append(row)
 
     return combined_image
+
+sea_monster_str = [
+    '                  # ',
+    '#    ##    ##    ###',
+    ' #  #  #  #  #  #   ',
+]
+sea_monster = [[c == '#' for c in s] for s in sea_monster_str]
+sea_monster_height = len(sea_monster)
+sea_monster_width = len(sea_monster[0])
+
+def is_sea_monster(image, start_x, start_y):
+    for y in range(sea_monster_height):
+        for x in range(sea_monster_width):
+            if sea_monster[y][x]:
+                if not image[start_y+y][start_x+x]:
+                    return False
+    return True
+
+def remove_sea_monster(image, start_x, start_y):
+    for y in range(sea_monster_height):
+        for x in range(sea_monster_width):
+            if sea_monster[y][x]:
+                image[start_y+y][start_x+x] = False
+
+def remove_sea_monsters_with_orientation(image, orientation):
+    image_length = len(image)
+    image_oriented = get_orientation(image, orientation)
+    changed = False
+
+    for x in range(0, image_length - sea_monster_width):
+        for y in range(0, image_length - sea_monster_height):
+            if is_sea_monster(image_oriented, x, y):
+                changed = True
+                remove_sea_monster(image_oriented, x, y)
+    if changed:
+        return sum(sum(row) for row in image_oriented)
+    else:
+        return None
+
+def get_roughness(image):
+    # Test each orientation until we find one that had sea monsters.
+    for orientation in Orientation:
+        roughness = remove_sea_monsters_with_orientation(image, orientation)
+        if roughness is not None:
+            return roughness
+    else:
+        raise Exception('No sea monsters found in any orientation')
 
 class Test(unittest.TestCase):
     def test_reverse_edge(self):
@@ -296,16 +345,54 @@ class Test(unittest.TestCase):
         tiles_sorted, _ = sort_tiles(tiles)
         self.assertEqual(set(tiles_sorted.corners), set((1951, 3079, 2971, 1171)))
 
+    @staticmethod
+    def read_image(f):
+        return [[c == '#' for c in line.rstrip()] for line in f]
+
     def test_assemble_image(self):
         with open('test1.txt') as f:
             tiles = parse_input(f)
 
-        # There are multiple possible solutions for this, so just run it and make sure it doesn't fail.
         image = assemble_image(tiles)
+        combined = combine_tiles(image)
 
         tiles_sorted, _ = sort_tiles(tiles)
         corners = [t.tile_num for t in (image[0][0], image[0][-1], image[-1][-1], image[-1][0])]
         self.assertEqual(set(corners), tiles_sorted.corners)
+
+        with open('test_combined_image.txt') as f:
+            expected_image = self.read_image(f)
+
+        self.assertTrue(any(get_orientation(combined, ori) == expected_image for ori in Orientation))
+
+    def test_is_sea_monster(self):
+        with open('test_combined_image.txt') as f:
+            image = self.read_image(f)
+
+        image_oriented = get_orientation(image, Orientation.FLIPPED_ROTATED_270)
+        for y in range(len(image) - sea_monster_height):
+            for x in range(len(image) - sea_monster_width):
+                self.assertEqual(is_sea_monster(image_oriented, x, y), (x, y) in ((2, 2), (1, 16)))
+
+    def test_remove_sea_monsters(self):
+        with open('test_combined_image.txt') as f:
+            combined = self.read_image(f)
+
+        expected = [None, None, None, None, None, None, None, 273]
+        for ori, exp in zip(Orientation, expected):
+            self.assertEqual(remove_sea_monsters_with_orientation(combined, ori), exp, ori)
+
+    def test_get_roughness(self):
+        with open('test_combined_image.txt') as f:
+            combined = self.read_image(f)
+        self.assertEqual(get_roughness(combined), 273)
+
+        with open('test1.txt') as f:
+            tiles = parse_input(f)
+
+        image = assemble_image(tiles)
+        test1 = combine_tiles(image)
+        self.assertEqual(get_roughness(test1), 273)
 
 if __name__ == '__main__':
     unittest.main(exit=False)
@@ -314,5 +401,5 @@ if __name__ == '__main__':
         tiles = parse_input(f)
 
     image = assemble_image(tiles)
-    corners = [t.tile_num for t in (image[0][0], image[0][-1], image[-1][-1], image[-1][0])]
-    print(functools.reduce(operator.mul, corners, 1))
+    combined = combine_tiles(image)
+    print(get_roughness(combined))
