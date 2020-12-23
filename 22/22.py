@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import copy
+import itertools
 import unittest
 from collections import deque
 
@@ -32,6 +33,42 @@ def play_game(decks):
         play_round(decks)
     return get_score(decks[0] if decks[0] else decks[1])
 
+def copy_deck(deck, n):
+    return deque(itertools.islice(deck, 0, n))
+
+def play_round_recursive(decks):
+    cards = decks[0].popleft(), decks[1].popleft()
+    assert(cards[0] != cards[1])
+
+    if len(decks[0]) >= cards[0] and len(decks[1]) >= cards[1]:
+        new_decks = (copy_deck(decks[0], cards[0]), (copy_deck(decks[1], cards[1])))
+        winner, _ = play_game_recursive(new_decks)
+    else:
+        winner = 0 if cards[0] > cards[1] else 1
+
+    if winner == 0:
+        decks[0].append(cards[0])
+        decks[0].append(cards[1])
+    else:
+        decks[1].append(cards[1])
+        decks[1].append(cards[0])
+
+def play_game_recursive(decks):
+    prev_rounds = set()
+    winner = None
+
+    while decks[0] and decks[1]:
+        if (tuple(decks[0]), tuple(decks[1])) in prev_rounds:
+            winner = 0
+            break
+
+        prev_rounds.add((tuple(decks[0]), tuple(decks[1])))
+        play_round_recursive(decks)
+
+    if winner is None:
+        winner = 0 if decks[0] else 1
+    return winner, get_score(decks[winner])
+
 class Test(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -55,10 +92,19 @@ class Test(unittest.TestCase):
         decks = copy.deepcopy(self.test1decks)
         self.assertEqual(play_game(decks), 306)
 
+    def test_play_game_recursive(self):
+        with open('test2.txt') as f:
+            decks = parse_input(f)
+        self.assertEqual(play_game_recursive(decks), (0, 105))
+
+        with open('test1.txt') as f:
+            decks = parse_input(f)
+        self.assertEqual(play_game_recursive(decks), (1, 291))
+
 if __name__ == '__main__':
     unittest.main(exit=False)
 
     with open('input.txt') as f:
         decks = parse_input(f)
 
-    print(play_game(decks))
+    print(play_game_recursive(decks))
