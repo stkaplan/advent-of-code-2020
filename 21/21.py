@@ -51,6 +51,10 @@ def count_occurrences_with_no_allergens(foods, allergens):
     no_allergens = [i for i in all_ingredients if i not in allergens.values()]
     return sum(count_occurrences(foods, i) for i in no_allergens)
 
+def get_canonical_dangerous_ingredients_list(allergens):
+    ingredients = (allergens[a] for a in sorted(allergens))
+    return str.join(',', ingredients)
+
 class Test(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -82,6 +86,9 @@ class Test(unittest.TestCase):
         self.assertEqual(count_occurrences(self.test1foods, 'sbzzf'), 2)
         self.assertEqual(count_occurrences_with_no_allergens(self.test1foods, self.test1allergens), 5)
 
+    def test_get_canonical_dangerous_ingredients_list(self):
+        self.assertEqual(get_canonical_dangerous_ingredients_list(self.test1allergens), 'mxmxvkd,sqjhc,fvjkl')
+
 if __name__ == '__main__':
     unittest.main(exit=False)
 
@@ -89,4 +96,4 @@ if __name__ == '__main__':
         foods = parse_input(f)
 
     allergens = find_allergens(foods)
-    print(count_occurrences_with_no_allergens(foods, allergens))
+    print(get_canonical_dangerous_ingredients_list(allergens))
