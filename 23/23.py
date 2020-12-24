@@ -2,119 +2,109 @@
 
 import unittest
 
-def parse_input(s):
-    return list(map(int, s))
+def parse_input(s, n=None):
+    nexts = {}
+    for i in range(len(s)-1):
+        nexts[int(s[i])] = int(s[i+1])
 
-def pop_next_cups(cups, start, num_cups):
-    popped = cups[start:start+num_cups]
-    del cups[start:start+num_cups]
-
-    if len(popped) < num_cups:
-        remaining = num_cups - len(popped)
-        popped += cups[0:remaining]
-        del cups[0:remaining]
-
-    return popped
-
-def insert_cups(cups, moved, start):
-    for i, cup in enumerate(moved):
-        cups.insert(start+i, cup)
+    if n is None:
+        nexts[int(s[len(s)-1])] = int(s[0])
+    else:
+        last_supplied = int(s[-1])
+        nexts[last_supplied] = len(s) + 1
+        for i in range(len(s)+1, n):
+            nexts[i] = i+1
+        nexts[n] = int(s[0])
+    return nexts, int(s[0])
     
-def move_cups(cups, current_index):
+def move_cups(nexts, current_cup):
     num_cups = 3
-    
-    current_cup = cups[current_index]
-    popped = pop_next_cups(cups, current_index+1, num_cups)
+
+    moved = []
+    next_moved = nexts[current_cup]
+    for _ in range(num_cups):
+        moved.append(next_moved)
+        next_moved = nexts[next_moved]
 
     target = current_cup - 1
     if target == 0:
-        target = max(cups)
-    while True:
-        try:
-            dest = cups.index(target) + 1
-            break
-        except ValueError:
-            target -= 1
-            if target == 0:
-                target = max(cups)
+        target = len(nexts)
+    while target in moved:
+        target -= 1
+        if target == 0:
+            target = len(nexts)
+    old_target_next = nexts[target]
 
-    insert_cups(cups, popped, dest)
+    nexts[current_cup] = nexts[moved[-1]]
+    nexts[target] = moved[0]
+    nexts[moved[-1]] = old_target_next
 
-def play_game(cups, rounds):
-    index = 0
+def play_game(nexts, start, rounds):
+    current_cup = start
     for _ in range(rounds):
-        current_cup = cups[index]
-        move_cups(cups, index)
+        move_cups(nexts, current_cup)
+        current_cup = nexts[current_cup]
 
-        # The cups have been scrambled, so find where the current one ended up.
-        index = cups.index(current_cup)
-        index = (index + 1) % len(cups)
+def cups_after(nexts, start, n=None):
+    if n is None:
+        n = len(nexts) - 1
 
-def cups_after(cups, n):
-    start = cups.index(n)
-    return cups[start+1:] + cups[0:start]
+    after = []
+    current = start
+    for _ in range(n):
+        current = nexts[current]
+        after.append(current)
+    return after
 
 class Test(unittest.TestCase):
-    def test_pop_next_cups(self):
-        starting_cups = parse_input('389125467')
-        
-        cups = starting_cups.copy()
-        popped = pop_next_cups(cups, 0, 3)
-        self.assertEqual(cups, [1,2,5,4,6,7])
-        self.assertEqual(popped, [3,8,9])
+    def test_parse_input(self):
+        nexts, start = parse_input('389125467')
+        self.assertEqual(nexts, {3:8, 8:9, 9:1, 1:2, 2:5, 5:4, 4:6, 6:7, 7:3})
+        self.assertEqual(start, 3)
 
-        cups = starting_cups.copy()
-        popped = pop_next_cups(cups, 3, 3)
-        self.assertEqual(cups, [3,8,9,4,6,7])
-        self.assertEqual(popped, [1,2,5])
-
-        cups = starting_cups.copy()
-        popped = pop_next_cups(cups, 6, 3)
-        self.assertEqual(cups, [3,8,9,1,2,5])
-        self.assertEqual(popped, [4,6,7])
-
-        cups = starting_cups.copy()
-        popped = pop_next_cups(cups, 8, 3)
-        self.assertEqual(cups, [9,1,2,5,4,6])
-        self.assertEqual(popped, [7,3,8])
-
-    def test_insert_cups(self):
-        cups = [3,2,5,4,6,7]
-        moved = [8,9,1]
-        insert_cups(cups, moved, 2)
-        self.assertEqual(cups, [3,2,8,9,1,5,4,6,7])
-
-        cups = [3,2,5,4,6,7]
-        moved = [8,9,1]
-        insert_cups(cups, moved, 6)
-        self.assertEqual(cups, [3,2,5,4,6,7,8,9,1])
+        nexts, start = parse_input('389125467', 15)
+        self.assertEqual(nexts, {3:8, 8:9, 9:1, 1:2, 2:5, 5:4, 4:6, 6:7, 7:10, 10:11, 11:12, 12:13, 13:14, 14:15, 15:3})
+        self.assertEqual(start, 3)
 
     def test_move_cups(self):
-        cups = parse_input('389125467')
-        move_cups(cups, 0)
-        self.assertEqual(cups, [3,2,8,9,1,5,4,6,7])
-        move_cups(cups, 1)
-        self.assertEqual(cups, [3,2,5,4,6,7,8,9,1])
-        move_cups(cups, 2)
-        self.assertEqual(cups, [3,4,6,7,2,5,8,9,1])
+        nexts, _ = parse_input('389125467')
+
+        move_cups(nexts, 3)
+        new_nexts, _ = parse_input('328915467')
+        self.assertEqual(nexts, new_nexts)
+
+        move_cups(nexts, 2)
+        new_nexts, _ = parse_input('325467891')
+        self.assertEqual(nexts, new_nexts)
+
+        move_cups(nexts, 5)
+        new_nexts, _ = parse_input('725891346')
+        self.assertEqual(nexts, new_nexts)
 
     def test_cups_after(self):
-        cups = [5,8,3,7,4,1,9,2,6]
-        self.assertEqual(cups_after(cups, 1), [9,2,6,5,8,3,7,4])
+        nexts, _ = parse_input('583741926')
+        self.assertEqual(cups_after(nexts, 1), [9,2,6,5,8,3,7,4])
 
     def test_play_game(self):
-        cups = parse_input('389125467')
-        play_game(cups, 10)
-        self.assertEqual(cups_after(cups, 1), [9,2,6,5,8,3,7,4])
+        nexts, start = parse_input('389125467')
+        play_game(nexts, start, 10)
+        self.assertEqual(cups_after(nexts, 1), [9,2,6,5,8,3,7,4])
 
-        cups = parse_input('389125467')
-        play_game(cups, 100)
-        self.assertEqual(cups_after(cups, 1), [6,7,3,8,4,5,2,9])
+        nexts, start = parse_input('389125467')
+        play_game(nexts, start, 100)
+        self.assertEqual(cups_after(nexts, 1), [6,7,3,8,4,5,2,9])
+
+    def test_part2_example(self):
+        nexts, start = parse_input('389125467', 1000000)
+        play_game(nexts, start, 10000000)
+        self.assertEqual(cups_after(nexts, 1, 2), [934001, 159792])
 
 if __name__ == '__main__':
     unittest.main(exit=False)
 
     input_ = '364289715'
-    cups = parse_input(input_)
-    play_game(cups, 100)
-    print(str.join('', map(str, cups_after(cups, 1))))
+    nexts, start = parse_input(input_, 1000000)
+    play_game(nexts, start, 10000000)
+    after = cups_after(nexts, 1, 2)
+    print(after)
+    print(after[0] * after[1])
