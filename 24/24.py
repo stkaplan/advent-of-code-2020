@@ -2,8 +2,12 @@
 
 import unittest
 from collections import namedtuple
+from enum import Enum
 
 Point = namedtuple('Point', ['x', 'y'])
+class Color(Enum):
+    WHITE = 0
+    BLACK = 1
 
 def split_tokens(s):
     i = 0
@@ -66,6 +70,38 @@ def get_black_tiles(step_lists):
             black_tiles.add(point)
     return black_tiles
 
+def get_all_neighbors(point):
+    return [get_neighbor_point(point, d) for d in ('e', 'w', 'ne', 'nw', 'se', 'sw')]
+
+def get_tile_color(tiles, point):
+    try:
+        return tiles[point]
+    except KeyError:
+        return Color.WHITE
+
+def flip_tiles(tiles):
+    # Add all neighbors to the list of points we're considering.
+    missing_neighbors = []
+    for point, color in tiles.items():
+        if color == Color.BLACK:
+            for neighbor in get_all_neighbors(point):
+                if neighbor not in tiles:
+                    missing_neighbors.append(neighbor)
+    for neighbor in missing_neighbors:
+        tiles[neighbor] = Color.WHITE
+
+    new_tiles = {}
+    for point, color in tiles.items():
+        black_neighbors = sum(get_tile_color(tiles, neighbor) == Color.BLACK for neighbor in get_all_neighbors(point))
+        if color == Color.BLACK:
+            new_tiles[point] = Color.WHITE if black_neighbors == 0 or black_neighbors > 2 else Color.BLACK
+        else:
+            new_tiles[point] = Color.BLACK if black_neighbors == 2 else Color.WHITE
+    return new_tiles
+
+def count_black_tiles(tiles):
+    return sum(color == Color.BLACK for color in tiles.values())
+
 class Test(unittest.TestCase):
     def test_parse_input(self):
         line = 'esenee\n'
@@ -87,10 +123,40 @@ class Test(unittest.TestCase):
         black_tiles = get_black_tiles(step_lists)
         self.assertEqual(len(black_tiles), 10)
 
+    def test_flip_tiles(self):
+        with open('test1.txt') as f:
+            step_lists = parse_input(f)
+        black_tiles = get_black_tiles(step_lists)
+        tiles = {point: Color.BLACK for point in black_tiles}
+        self.assertEqual(count_black_tiles(tiles), 10)
+
+        tiles = flip_tiles(tiles)
+        self.assertEqual(count_black_tiles(tiles), 15)
+        tiles = flip_tiles(tiles)
+        self.assertEqual(count_black_tiles(tiles), 12)
+        tiles = flip_tiles(tiles)
+        self.assertEqual(count_black_tiles(tiles), 25)
+        tiles = flip_tiles(tiles)
+        self.assertEqual(count_black_tiles(tiles), 14)
+        tiles = flip_tiles(tiles)
+        self.assertEqual(count_black_tiles(tiles), 23)
+
+        for _ in range(5):
+            tiles = flip_tiles(tiles)
+        self.assertEqual(count_black_tiles(tiles), 37)
+
+        for _ in range(90):
+            tiles = flip_tiles(tiles)
+        self.assertEqual(count_black_tiles(tiles), 2208)
+
+
 if __name__ == '__main__':
     unittest.main(exit=False)
 
     with open('input.txt') as f:
         step_lists = parse_input(f)
     black_tiles = get_black_tiles(step_lists)
-    print(len(black_tiles))
+    tiles = {point: Color.BLACK for point in black_tiles}
+    for _ in range(100):
+        tiles = flip_tiles(tiles)
+    print(count_black_tiles(tiles))
